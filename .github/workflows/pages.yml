@@ -1,0 +1,39 @@
+# Publishes the public website (site/) to GitHub Pages. The whole repository is the site;
+# it holds only the public page.
+#
+# Requirements before it can run: the repository's Pages source set to "GitHub Actions"
+# (Settings -> Pages), and a plan that allows Pages for this repository's visibility. For a
+# private repository that means GitHub Pro, Team or Enterprise; the published site is public
+# either way.
+#
+# It runs on every push to main, or by hand from the Actions tab.
+name: Publish site
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4

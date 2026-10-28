@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KERNEL-OPS</title>
+<meta name="description" content="KERNEL-OPS proposes which machines need an inspection, from your own telemetry and work orders, and is tested first in shadow mode on your equipment.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single long work-order packet; one reading column, with the evidence ledger as the one wide table. */
+:root {
+  --paper: #f6f7f8;
+  --sheet: #ffffff;
+  --ink: #18212b;
+  --muted: #56616e;
+  --rule: #d9dee4;
+  --steel: #1f4e79;
+  --tag: #b35f00;
+  --tag-bg: #fff4e3;
+  --ok: #2e6b3f;
+  --ok-bg: #e9f4ec;
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #12171d; --sheet: #182029; --ink: #e6ebf0; --muted: #9ba8b6; --rule: #2c3743;
+    --steel: #8cb8e6; --tag: #f0a54a; --tag-bg: #2b2114; --ok: #7cc48f; --ok-bg: #16261b; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #12171d; --sheet: #182029; --ink: #e6ebf0; --muted: #9ba8b6; --rule: #2c3743;
+  --steel: #8cb8e6; --tag: #f0a54a; --tag-bg: #2b2114; --ok: #7cc48f; --ok-bg: #16261b; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  margin: 0; background: var(--paper); color: var(--ink); font-family: var(--body);
+  font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+a { color: var(--steel); text-underline-offset: 3px; }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--steel); outline-offset: 3px; }
+.wrap { max-width: 52rem; margin: 0 auto; display: grid; gap: 64px; }
+nav.top {
+  max-width: 52rem; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: baseline;
+  justify-content: space-between; gap: 8px 24px; padding-block: 20px; border-bottom: 1px solid var(--rule);
+}
+.brand { font-family: var(--display); font-weight: 700; font-size: 1.4rem; letter-spacing: 0.04em; color: var(--ink); text-decoration: none; }
+.brand small { font-family: var(--mono); font-weight: 400; font-size: 0.7rem; letter-spacing: 0.08em; color: var(--muted); margin-left: 8px; text-transform: uppercase; }
+nav.top ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 20px; font-size: 0.95rem; }
+nav.top a { color: var(--muted); text-decoration: none; }
+nav.top a:hover { color: var(--ink); }
+.eyebrow { font-family: var(--mono); font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+h1, h2 { font-family: var(--display); font-weight: 600; line-height: 1.05; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2.6rem, 8vw, 4.4rem); letter-spacing: 0.005em; }
+h2 { font-size: clamp(1.8rem, 4vw, 2.3rem); color: var(--steel); }
+h3 { font-size: 1.02rem; font-weight: 600; margin: 0; }
+p { margin: 0; max-width: 65ch; }
+.lede { font-size: 1.2rem; }
+section { display: grid; gap: 20px; scroll-margin-top: 16px; }
+.hero { display: grid; gap: 20px; padding-top: 48px; border-bottom: 2px solid var(--ink); padding-bottom: 40px; }
+.cta-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.button {
+  display: inline-block; font-family: var(--display); font-weight: 600; font-size: 1.15rem; letter-spacing: 0.03em;
+  padding: 10px 18px; border: 2px solid var(--ink); color: var(--paper); background: var(--ink); text-decoration: none;
+}
+.button.ghost { background: transparent; color: var(--ink); }
+.boundary {
+  background: var(--tag-bg); border: 1px solid var(--tag); border-left-width: 6px;
+  padding: 18px 20px; display: grid; gap: 8px;
+}
+.label { font-family: var(--mono); font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; }
+.boundary .label { color: var(--tag); }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 32px; }
+.card { background: var(--sheet); border: 1px solid var(--rule); padding: 18px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.card .k { font-family: var(--mono); font-size: 12.5px; color: var(--muted); letter-spacing: 0.06em; }
+.card p { font-size: 0.95rem; color: var(--muted); }
+.feature { display: grid; gap: 4px; padding-left: 14px; border-left: 2px solid var(--rule); min-width: 0; }
+.feature p { color: var(--muted); font-size: 0.97rem; }
+.steps { display: grid; border-top: 1px solid var(--rule); }
+.step { display: grid; grid-template-columns: 9rem 1fr; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--rule); }
+.step .when { font-family: var(--display); font-size: 1.15rem; font-weight: 600; color: var(--steel); }
+.step > div { min-width: 0; display: grid; gap: 6px; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); background: var(--sheet); }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; min-width: 40rem; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+tbody tr:last-child td { border-bottom: 0; }
+th { font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.verdict { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border: 1px solid currentColor; white-space: nowrap; }
+.verdict.no { color: var(--tag); background: var(--tag-bg); }
+.verdict.maybe { color: var(--steel); }
+.verdict.sim { color: var(--ok); background: var(--ok-bg); }
+.caption { font-size: 0.88rem; color: var(--muted); }
+ul.asks { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 32px; }
+ul.asks li { display: grid; gap: 2px; padding-left: 14px; border-left: 2px solid var(--rule); min-width: 0; }
+ul.asks .why { color: var(--muted); font-size: 0.95rem; }
+details { border-top: 1px solid var(--rule); padding-block: 12px; }
+details:last-of-type { border-bottom: 1px solid var(--rule); }
+summary { cursor: pointer; font-weight: 600; }
+details p { margin-top: 8px; color: var(--muted); }
+.contact { background: var(--sheet); border: 2px solid var(--ink); padding: 24px; display: grid; gap: 14px; }
+.contact .address { font-family: var(--mono); font-size: 1rem; user-select: all; }
+footer { max-width: 52rem; margin: 64px auto 0; border-top: 1px solid var(--rule); padding-top: 20px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; color: var(--muted); font-size: 0.88rem; }
+@media (max-width: 680px) {
+  .grid3, .grid2, ul.asks { grid-template-columns: 1fr; }
+  .step { grid-template-columns: 1fr; gap: 4px; }
+}
+</style>
+</head>
+<body>
+
+<nav class="top" aria-label="Main">
+  <a class="brand" href="#top">KERNEL-OPS<small>WattsWorth Technologies</small></a>
+  <ul>
+    <li><a href="#what">What it does</a></li>
+    <li><a href="#pilot">Shadow pilot</a></li>
+    <li><a href="#evidence">Evidence</a></li>
+    <li><a href="#contact">Contact</a></li>
+  </ul>
+</nav>
+
+<main class="wrap" id="top">
+
+  <header class="hero">
+    <div class="eyebrow">Inspection planning for maintenance teams</div>
+    <h1>Know which machine to inspect next, and be able to check why</h1>
+    <p class="lede">KERNEL-OPS reads the telemetry and work orders you already have and proposes which assets need an inspection this week, within the crew capacity you set. Every proposal comes with the evidence it was based on, limited to what was known at the moment it was made.</p>
+    <div class="cta-row">
+      <a class="button" href="#pilot">Run a shadow pilot</a>
+      <a class="button ghost" href="#evidence">See the evidence so far</a>
+    </div>
+  </header>
+
+  <section id="what" aria-labelledby="what-h">
+    <h2 id="what-h">What it does</h2>
+    <div class="grid2">
+      <div class="feature"><h3>Proposes inspection jobs</h3><p>Scores each enrolled asset every day and records the inspections it would ask for, never more per week than your crew can take. Repeat alerts on one machine join its open job instead of piling up.</p></div>
+      <div class="feature"><h3>Uses only what was known at the time</h3><p>A reading that arrived late, or a diagnosis typed in days after a job, is never treated as known earlier. Any past decision can be rebuilt exactly as it was made.</p></div>
+      <div class="feature"><h3>Shows its evidence</h3><p>Each alert opens an evidence pack: the readings and maintenance history before the decision, what has been learned since, and what is missing. A morning brief lists what ran, what needs review and what is blocked.</p></div>
+      <div class="feature"><h3>Keeps your team in charge</h3><p>Your maintenance lead records each outcome: fault confirmed, no fault found, or not looked at. Nothing is dispatched automatically, and an optional AI assistant only drafts notes for a person to judge. It is off unless you set a spending cap.</p></div>
+    </div>
+  </section>
+
+  <section id="pilot" aria-labelledby="pilot-h">
+    <h2 id="pilot-h">The shadow pilot</h2>
+    <p>The first step with any site is a shadow pilot on one asset class: the system watches and records, and changes nothing.</p>
+    <div class="boundary" role="note">
+      <div class="label">Shadow boundary</div>
+      <p><strong>Nothing is dispatched.</strong> No crew is sent, no work order is created in your maintenance system, and your maintenance plan runs exactly as it does today.</p>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="when">Before day one</div><div><p>One intake conversation with your maintenance lead, and a small export of a few months of sensor data, work orders and, if you keep them, alarm or fault-code logs. A readiness check refuses to start while any decision you need to make is still blank.</p></div></div>
+      <div class="step"><div class="when">Every day</div><div><p>Automatic. New data is loaded, each enrolled asset is scored, and proposed inspection jobs are recorded within your weekly crew capacity.</p></div></div>
+      <div class="step"><div class="when">Every week</div><div><p>A short review with your maintenance lead, recording what happened to each proposed job. How long it takes depends on the capacity you set; we agree it up front.</p></div></div>
+      <div class="step"><div class="when">At the end</div><div><p>A report setting every proposal against what happened to that asset, with every assumption the pilot rested on.</p></div></div>
+    </div>
+
+    <h3>How a pilot is judged</h3>
+    <div class="grid3">
+      <div class="card"><span class="k">A</span><h3>Did it run reliably?</h3><p>Every day processed or recovered, nothing lost, delays explained.</p></div>
+      <div class="card"><span class="k">B</span><h3>Did it fit your routine?</h3><p>Every proposal reviewed in time, and your lead finds the queue workable.</p></div>
+      <div class="card"><span class="k">C</span><h3>Does it predict failures?</h3><p>Answered only once enough real failures have happened and been followed up. Not promised by the pilot.</p></div>
+    </div>
+  </section>
+
+  <section id="evidence" aria-labelledby="evidence-h">
+    <h2 id="evidence-h">The evidence so far</h2>
+    <p>We test the model the way we would want it tested at your site. Each test is written down before its data is scored, run once, and has to beat chance baselines, such as the same failures moved to random times. On public data from real machines, it has not yet shown that it predicts failures.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Data</th><th>Machines</th><th>What we tested</th><th>Ranking score</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>Wind turbines (CARE, farm A)</td><td>5 turbines</td><td>Sensor data before recorded anomalies</td><td class="num">0.84</td><td><span class="verdict no">detection only</span> It recognised anomalies already in progress, not ahead of time.</td></tr>
+          <tr><td>Metro air compressor, 2020 (MetroPT-3)</td><td>1 unit, 4 air leaks</td><td>Sensor data, 24 hours ahead</td><td class="num">0.67</td><td><span class="verdict no">not established</span> Not distinguishable from chance baselines.</td></tr>
+          <tr><td>Same compressor, 2020</td><td>1 unit, 4 air leaks</td><td>Sensors plus low-pressure alarm counts</td><td class="num">0.75</td><td><span class="verdict maybe">narrow pass, exploratory</span> Designed after the previous result, so it needed confirming.</td></tr>
+          <tr><td>Metro air compressor, 2022 (MetroPT)</td><td>1 unit, 3 failures</td><td>The same recipe, fixed in advance, on unseen data</td><td class="num">0.31</td><td><span class="verdict no">not confirmed</span> Worse than chance. The warning signs differed from 2020.</td></tr>
+          <tr><td>Microsoft Azure maintenance data</td><td>100 machines, 761 failures</td><td>Sensors plus error counts, on held-out machines</td><td class="num">0.9998</td><td><span class="verdict sim">simulated data</span> Confirms the pipeline works without leaking future data. Says nothing about real equipment.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="caption">Ranking score: how often an hour before a failure is ranked above an ordinary hour. 0.5 is chance; 1.0 is perfect.</p>
+    <div class="grid2">
+      <div class="feature"><h3>What this tells us</h3><p>Warning signs differ between machines and over time, so a method fitted to one machine does not carry over to the next. The honest test is on your equipment, scored every day before the outcome is known, which is what a shadow pilot does.</p></div>
+      <div class="feature"><h3>What it also showed</h3><p>Recorded events such as alarms and fault codes mattered more than the choice of model. That is why the pilot asks for your alarm logs, not only sensor readings.</p></div>
+    </div>
+  </section>
+
+  <section id="needs" aria-labelledby="needs-h">
+    <h2 id="needs-h">What we need from a site</h2>
+    <ul class="asks">
+      <li><h3>A maintenance owner</h3><span class="why">The person who would decide whether an alert becomes a work order, and who signs off the findings.</span></li>
+      <li><h3>One asset class</h3><span class="why">Several similar machines, one ID per machine. If a machine appears under two IDs, we enroll the one you trust.</span></li>
+      <li><h3>Telemetry, and when it arrives</h3><span class="why">Signals, sampling interval, timezone, and how late data reaches you.</span></li>
+      <li><h3>Alarm and fault-code logs</h3><span class="why">With their times, if you keep them. They mattered most in our tests.</span></li>
+      <li><h3>Work orders with their edit history</h3><span class="why">So a diagnosis added later is never read as known earlier.</span></li>
+      <li><h3>Capacity and three costs</h3><span class="why">How many alert-driven inspections a week the crew could take, and the cost of downtime, of an inspection and of a false alarm.</span></li>
+    </ul>
+  </section>
+
+  <section id="questions" aria-labelledby="questions-h">
+    <h2 id="questions-h">Common questions</h2>
+    <div>
+      <details><summary>Does our data leave our site?</summary><p>Only if you choose. The pilot runs on one machine with local storage, and you decide where that machine sits and what may leave it.</p></details>
+      <details><summary>Will it change how we do maintenance?</summary><p>Not during a shadow pilot. It records proposals; your crew and your maintenance system work exactly as before.</p></details>
+      <details><summary>Do you use AI to make the decisions?</summary><p>No. Scores and proposals come from a model trained on your data. An optional assistant can draft an inspection note from the evidence, labelled as a draft, and it cannot record outcomes or change any setting. It makes no paid calls unless you set a spending cap.</p></details>
+      <details><summary>What if nothing fails during the pilot?</summary><p>Then the pilot still answers whether it ran reliably and fitted your routine. Whether it predicts failures waits until enough real outcomes exist.</p></details>
+    </div>
+  </section>
+
+  <section id="contact" aria-labelledby="contact-h">
+    <div class="contact">
+      <h2 id="contact-h">Start with one conversation</h2>
+      <p>Tell us who your maintenance owner would be, which asset class you would start with, and whether a small data export is possible. The questions above are the first conversation.</p>
+      <p class="address">[contact address]</p>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <span>KERNEL-OPS · WattsWorth Technologies</span>
+  <span>Results on this page come from the project's recorded tests and are updated as new ones are run.</span>
+</footer>
+
+</body>
+</html>
